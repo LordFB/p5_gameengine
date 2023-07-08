@@ -1,98 +1,134 @@
-let gos = [];
-let spawned = 0;
-let spawnInterval;
-let range = 20;
-let count = 0;
-
-let then;
-let deltaTime;
-
-let mouse;
-
-var rainbow;
-
-
-function setup() {
-    createCanvas(window.innerWidth, window.innerHeight);
-    background(45, 56, 200);
-    if ( count > 0 ) spawnInterval = setInterval(spawn, 250);
-    mouse = createVector(0,0);
-    rainbow = new Rainbow();
-    //rainbow.setSpectrum('#404258','#474E68','#50577A','#6B728E');
-}
-
-function draw() {
-    if ( mouseIsPressed ){
-        gos.push(new Circle(createVector(mouseX, mouseY)));
-        gos[gos.length - 1].addForce(createVector(random(-range, range), random(-range, range)));
-        background(45, 56, 200,1);
+class Transform {
+    constructor(position, rotation) {
+        var instance = GameEngine.getInstance();
+        if ( position === undefined ) position = instance.sketch.createVector(0,0);
+        this.position = position;
+        if ( rotation === undefined ) rotation = instance.sketch.createVector(0,0);
+        this.rotation = rotation;
     }
-    // calculate delta time (dt)
-    const now = new Date().getTime();
-    deltaTime = (now - then) * 0.001;
-    then = now;
-    mouse.x = mouseX;
-    mouse.y = mouseY;
-    gos.forEach(go => {
-        go.tick();
-    })
-}
-
-
-function spawn() {
-    gos.push(new Circle(createVector(width / 2, height + 50)));
-    gos[gos.length - 1].addForce(createVector(random(-range, range), random(-range, range)));
-    spawned++;
-    then = new Date().getTime();
+    setPosition(pos) {
+        this.position.x = pos.x;
+        this.position.y = pos.y;
+    }
+    setRotation(rot) {
+        this.rotation.x = rot.x;
+        this.rotation.y = rot.y;
+    }
 }
 
 class GameObject {
 
-    constructor(position) {
-        this.color = color('#' + rainbow.colorAt(frameCount % 400 * 0.25));
-        this.position = position;
-        this.vel = createVector(0, 0);
-        this.acc = createVector(0, 0);
-        this.age = 0;
+    constructor(name = 'New GameObject', position, rotation, components = {}) {
+        this.name = name;
+        this.transform = new Transform(position, rotation);
+        this.components = components;
+        this.components['Transform'] = this.transform;
     }
-    getAge(){
-        return this.age;
+    addComponent(component) {
+        this.components[component.name] = component;
     }
-    setPosition(pos) {
-        this.position = pos;
+
+    setPosition(pos, b) {
+        if (b) pos = {
+            x: pos,
+            y: b
+        };
+        this.transform.setPosition(pos, b)
     }
-    addForce(force) {
-        this.vel.add(force);
+    setRotation(rot, b) {
+        if (b) rot = {
+            x: rot,
+            y: b
+        };
+        this.transform.setRotation(rot, b);
     }
     tick() {
-        this.toMouse();
-        this.age += deltaTime;
-        this.acc.add(this.vel);
-        this.vel.mult(0);
-        this.position.add(this.acc);
-        this.acc.mult(0.95);
-    }
-    toMouse(){
-        let dir = mouse.copy().sub(this.position);
-        let dist = dir.mag();
-        this.addForce(dir.div(sqrt(dist)).mult(0.005).add(createVector(noise(frameCount),noise(frameCount)).mult(0.1)));
+        for ( const c in this.components ){
+            let comp = this.components[c];
+            if (comp.tick) comp .tick(this.components);
+        }
     }
 }
 
-class Circle extends GameObject {
-    constructor(position, color) {
-        super(position, color);
-        this.radius = random(10, 150);
-    }
-    tick() {
-        if ( this.radius < 5 ) return;
-        this.radius *= 0.99;
-        super.tick();
-        this.draw();
-    }
-    draw() {
-        fill(this.color)
-        //stroke( 255 - this.radius * 20 )
-        ellipse(this.position.x, this.position.y, this.radius)
+class Component {
+    constructor(name = 'New Component') {
+        this.name = name;
     }
 }
+
+class _Components {
+    constructor(pos, rot) {
+        this.library = {};
+        this.library.Circle = Circle;
+    }
+}
+
+var GameEngine = (() => {
+
+    class _GameEngine {
+        constructor() {
+            this.version = '0.02';
+            this.date = '2023-7-8';
+            console.log(`%c||||||||||||||||||||||||||||||||||||`, 'font-weight:bold;font-family:monospace');
+            console.log("%c| p5_gameEngine | v" + this.version + ' | ' + this.date + ' |', 'font-weight:bold;font-family:monospace;');
+            console.log(`%c||||||||||||||||||||||||||||||||||||`, 'font-weight:bold;font-family:monospace');
+            console.log(`%c  Crafted by FBP - No warranty and such`, 'font-weight:bold;font-family:monospace;font-size:10px;');
+            this.components = new _Components();
+            this.components = this.components.library;
+            this.gameObjects = [];
+            this.sketch = new p5((sketch) => {
+                sketch.setup = () => {
+                    sketch.createCanvas(window.innerWidth, window.innerHeight);
+                };
+                sketch.draw = () => {
+                    sketch.background(50, 80, 180);
+                    this.gameObjects.forEach(go => {
+                        go.tick();
+                    })
+                };
+            });
+        }
+        createObject(name = 'New GameObject') {
+            let obj = new GameObject(name);
+            this.gameObjects.push(obj);
+            return new Promise(res => res(obj));
+        }
+        getObjectByID(id) {
+            return this.gameObjects[id];
+        }
+    };
+
+    var instance;
+
+    return {
+        getInstance: function () {
+            if (!instance) {
+                instance = new _GameEngine();
+                delete instance.constructor;
+            }
+            return instance;
+        }
+    }
+})();
+
+
+class Circle extends Component {
+    constructor(radius = 10, color = 'white') {
+        super('Circle');
+        this.radius = radius;
+        this.color = color;
+    }
+    tick(components) {
+        let pos = components.Transform.position;
+        GameEngine.getInstance().sketch.ellipse(pos.x,pos.y,this.radius);
+    }
+}
+
+let obj;
+let p5ge = GameEngine.getInstance();
+
+p5ge.createObject().then(o => {
+    o.setPosition(window.innerWidth / 2, window.innerHeight / 2)
+    o.addComponent(new p5ge.components.Circle());
+    obj = o;
+});
