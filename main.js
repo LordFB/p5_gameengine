@@ -9,18 +9,16 @@ let deltaTime;
 
 let mouse;
 
-function spawn() {
-    gos.push(new Circle(createVector(width / 2, height + 50)));
-    gos[gos.length - 1].addForce(createVector(random(-range, range), random(-range, range)));
-    spawned++;
-    then = new Date().getTime();
-}
+var rainbow;
+
 
 function setup() {
     createCanvas(window.innerWidth, window.innerHeight);
     background(45, 56, 200);
     if ( count > 0 ) spawnInterval = setInterval(spawn, 250);
     mouse = createVector(0,0);
+    rainbow = new Rainbow();
+    //rainbow.setSpectrum('#404258','#474E68','#50577A','#6B728E');
 }
 
 function draw() {
@@ -40,10 +38,18 @@ function draw() {
     })
 }
 
+
+function spawn() {
+    gos.push(new Circle(createVector(width / 2, height + 50)));
+    gos[gos.length - 1].addForce(createVector(random(-range, range), random(-range, range)));
+    spawned++;
+    then = new Date().getTime();
+}
+
 class GameObject {
 
     constructor(position) {
-        this.color = color(random(0, 255), random(0, 255), random(0, 255));
+        this.color = color('#' + rainbow.colorAt(frameCount % 400 * 0.25));
         this.position = position;
         this.vel = createVector(0, 0);
         this.acc = createVector(0, 0);
